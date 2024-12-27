@@ -1,26 +1,34 @@
-// Fragment Shader
+#version 300 es
+
 precision mediump float;
 
-uniform sampler2D uETexture;  // Electric field texture
-uniform sampler2D uBTexture;  // Magnetic field texture
-uniform float dt;             // Time step
-uniform vec2 fieldDimensions; // Dimensions of the field texture
+in vec2 vCoord;
+out vec4 fragColor;
 
-varying vec2 v_texCoord;
+uniform float time;
+uniform vec2 mousePosition;
+uniform vec2 mouseVelocity;
+uniform sampler2D emField;  // Texture containing the electric field
+
+
+const float pi = 3.14159265359;
 
 void main() {
-    vec2 texelSize = 1.0 / fieldDimensions;
+    vec3 emFieldValue = texture(emField, vCoord).xyz;
+    vec2 E = emFieldValue.xy;
+    float Bz = emFieldValue.z;
 
-    // Read the current electric and magnetic field values from the textures
-    vec4 E = texture2D(uETexture, v_texCoord);
-    vec4 B = texture2D(uBTexture, v_texCoord);
+    vec2 rMouse = mousePosition - vCoord;
+    float rMouseAbs = length(rMouse);
 
-    // Update the electric field with a simple perturbation (example)
-    E.xy += vec2(sin(v_texCoord.x * 10.0), cos(v_texCoord.y * 10.0)) * 0.01 * dt;
+    float q = 1.0;
+    float epsilon0 = 1e1;
+    float EAbs = q / (4.0 * pi * epsilon0 * rMouseAbs * rMouseAbs);
 
-    // Update the magnetic field with a basic transformation (example)
-    B.z += sin(v_texCoord.x * 5.0) * 0.005 * dt;
+    float mu = 6e-1;
+    vec3 mouseVel = vec3(mouseVelocity, 0.0);
+    vec3 rMouse3 = vec3(rMouse, 0.0);
+    vec3 B = cross(mouseVel, rMouse3) * q * mu / (4.0 * pi * rMouseAbs * rMouseAbs * rMouseAbs);
 
-    // Write the updated fields back into the texture
-    gl_FragColor = vec4(E.xy, B.z, 1.0);
+    fragColor = vec4(B.z, EAbs, -B.z, 1.0);
 }

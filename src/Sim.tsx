@@ -1,10 +1,10 @@
 import './App.css'
 import { FunctionComponent, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Container, Sprite, Stage, useTick } from '@pixi/react'
+import { Container, Sprite, Stage, useApp, useTick } from '@pixi/react'
 import { FederatedPointerEvent, Geometry, Shader } from 'pixi.js'
-import fragmentShader from './shaders/triangleColor.vert?raw'
-import vertexShader from './shaders/triangleColor.frag?raw'
+import vertexShader from './shaders/triangleColor.vert?raw'
+import fragmentShader from './shaders/triangleColor.frag?raw'
 import emVert from './shaders/em.vert?raw'
 import emFrag from './shaders/em.frag?raw'
 import * as Pixi from 'pixi.js'
@@ -13,29 +13,6 @@ import { add, div, product, scale, sub, Vec2 } from './math'
 
 const pixelDimensions: Vec2 = [500, 500]
 const size = [10, 10]
-
-// Create a buffer to hold the field data (R = Ex, G = Ey, B = Bz, A = unused or auxiliary data)
-const emFieldTexture = Pixi.Texture.fromBuffer(
-  new Float32Array(product(pixelDimensions) * 4),
-  ...pixelDimensions,
-)
-
-const emFieldRenderer = new Pixi.Renderer({
-  width: pixelDimensions[0],
-  height: pixelDimensions[1],
-  preserveDrawingBuffer: true,
-})
-const emFieldRenderTexture = Pixi.RenderTexture.create({
-  width: pixelDimensions[0],
-  height: pixelDimensions[1],
-})
-const fieldSprite = new Pixi.Sprite(Pixi.Texture.WHITE) // Placeholder sprite
-
-const fieldShader = Pixi.Shader.from(emVert, emFrag)
-
-fieldShader.uniforms.uEMTexture = emFieldTexture
-fieldShader.uniforms.fieldDimensions = pixelDimensions
-fieldShader.uniforms.dt = 0.016 // Example time step
 
 const geometry = new Geometry()
   .addAttribute(
@@ -54,6 +31,16 @@ const geometry = new Geometry()
       pixelDimensions[0],
       pixelDimensions[1],
     ], // x, y
+    2,
+  )
+  .addAttribute(
+    'aTextureCoord',
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ].flat(),
     2,
   )
   .addAttribute(
@@ -82,7 +69,7 @@ export const Sim = () => {
 
 // More narrow uniform type
 const useUniforms = <T extends Record<string, unknown>>(uniforms: T) => {
-  const uniformsObj = useMemo(() => structuredClone(uniforms), [])
+  const uniformsObj = useMemo(() => uniforms, [])
 
   useEffect(() => {
     Object.assign(uniformsObj, uniforms)
@@ -101,6 +88,7 @@ type FieldUniforms = {
   dt: number
   mousePosition: Vec2
   mouseVelocity: Vec2
+  emField: Pixi.Texture
 }
 
 const useShader = (
@@ -137,12 +125,29 @@ const SimWithContext: FunctionComponent = () => {
   const [mousePosition, setMousePosition] = useState<Vec2>([0, 0])
   const containerRef = useRef<Pixi.Container>(null)
 
+  const [textures, setTextures] = useState({
+    current: Pixi.RenderTexture.create({
+      width: pixelDimensions[0],
+      height: pixelDimensions[1],
+    }),
+    next: Pixi.RenderTexture.create({
+      width: pixelDimensions[0],
+      height: pixelDimensions[1],
+    }),
+  })
+
   const uniforms = useUniforms<FieldUniforms>({
     time: state.time,
     dt: state.dt,
     mousePosition: state.mousePosition.current,
     mouseVelocity: state.mouseVelocity,
+    emField: textures.current,
   })
+
+  const instantShader = useShader(fragmentShader, vertexShader, uniforms)
+  const emFieldShader = useShader(emFrag, emVert, uniforms)
+
+  const app = useApp()
 
   useTick((_, ticker) => {
     const dt = ticker.deltaMS / 1000
@@ -160,9 +165,16 @@ const SimWithContext: FunctionComponent = () => {
         dt,
       )
 
-      emFieldRenderer.render(fieldSprite, {
-        renderTexture: emFieldRenderTexture,
+      const emFieldMesh = new Pixi.Mesh(geometry, emFieldShader)
+
+      app.renderer.render(emFieldMesh, {
+        renderTexture: textures.next,
       })
+
+      setTextures((prev) => ({
+        current: prev.next,
+        next: prev.current,
+      }))
 
       return {
         dt,
@@ -172,8 +184,6 @@ const SimWithContext: FunctionComponent = () => {
       }
     })
   })
-
-  const shader = useShader(vertexShader, fragmentShader, uniforms)
 
   const handleMouseOver = (e: FederatedPointerEvent) => {
     const local = containerRef.current?.toLocal(e.data.global)
@@ -195,15 +205,15 @@ const SimWithContext: FunctionComponent = () => {
       interactive={true}
       onmousemove={handleMouseOver}
     >
-      <Mesh
-        geometry={geometry}
-        shader={shader}
-      />
-      {/*<Sprite*/}
-      {/*  texture={Pixi.Texture.WHITE}*/}
-      {/*  width={pixelDimensions[0]}*/}
-      {/*  height={pixelDimensions[1]}*/}
+      {/*<Mesh*/}
+      {/*  geometry={geometry}*/}
+      {/*  shader={instantShader}*/}
       {/*/>*/}
+      <Sprite
+        texture={textures.current}
+        width={pixelDimensions[0]}
+        height={pixelDimensions[1]}
+      />
     </Container>
   )
 }

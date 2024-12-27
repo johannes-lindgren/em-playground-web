@@ -9,7 +9,7 @@ uniform mat3 translationMatrix;
 uniform mat3 projectionMatrix;
 
 out vec2 vCoord;
-out vec4 vTextureCoord;
+out vec2 vTextureCoord;
 
 void main() {
     vCoord = aCoord;

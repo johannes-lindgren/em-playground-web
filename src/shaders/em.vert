@@ -1,8 +1,17 @@
-// Vertex Shader
-attribute vec2 a_position;
-varying vec2 v_texCoord;
+#version 300 es
+
+precision mediump float;
+
+in vec2 aVertexPosition;
+in vec2 aCoord;
+
+uniform mat3 translationMatrix;
+uniform mat3 projectionMatrix;
+
+out vec2 vCoord;
+out vec2 vTextureCoord;
 
 void main() {
-    gl_Position = vec4(a_position, 0.0, 1.0);
-    v_texCoord = a_position * 0.5 + 0.5;  // Transform to [0, 1] range
+    vCoord = aCoord;
+    gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);
 }
