@@ -8,10 +8,9 @@ import fragmentShader from './shaders/triangleColor.frag?raw'
 import emVert from './shaders/em.vert?raw'
 import emFrag from './shaders/em.frag?raw'
 import * as Pixi from 'pixi.js'
-import { Mesh } from './Mesh.tsx'
-import { add, div, product, scale, sub, Vec2 } from './math'
+import { add, div, scale, sub, Vec2 } from './math'
 
-const pixelDimensions: Vec2 = [500, 500]
+const pixelDimensions: Vec2 = [512, 512]
 const size = [10, 10]
 
 const geometry = new Geometry()
